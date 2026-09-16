@@ -7,7 +7,6 @@
 <meta property="og:title" content="達人網旅行社｜行程報名">
 <meta property="og:description" content="線上瀏覽行程、選擇出發日期，三分鐘完成報名">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://dotzingtravel-code.github.io/travel/">
 <base target="_top">
 <style>
 :root{--ink:#0f1f38;--ink-2:#41536f;--line:#dbe3ee;--bg:#eef2f7;--brand:#1652a8;--brand-2:#2f7fe0;
@@ -280,9 +279,9 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v6.3';
-const API_URL='https://script.google.com/macros/s/AKfycbwOtBdlBosQj41HXqDraR4TwrSuRCR7xYEtswS6WQf-FOXm43WiT2e4fwZGZdwJQQ3-Ng/exec';
-const TOKEN='dotzingtravelcom';
+const APP_VER='v6.4';
+const API_URL='';
+const TOKEN='';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
   pickups:[],rooms:['雙人房（2人1室）','三人房（3人1室）','四人房（4人1室）','單人房（需補差額）','與同行者同房'],
   meals:['葷食','素食','不吃牛','不吃豬','其他（見備註）'],seats:['靠窗','靠走道','無指定'],
@@ -388,34 +387,54 @@ async function api(payload){
     });
   }
   if(!API_URL)return{ok:false,msg:'尚未設定 API_URL'};
+  return apiFetch(payload,2);
+}
+/* fetch() 沒有內建逾時，若不設上限，Apps Script 回應慢或卡住時會永遠等下去，
+   畫面就卡死在「載入中」。這裡設 12 秒逾時，逾時或失敗時自動重試一次再放棄。 */
+async function apiFetch(payload,tries){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),12000);
   try{
     const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({token:TOKEN,...payload})});
+      body:JSON.stringify({token:TOKEN,...payload}),signal:ctrl.signal});
+    clearTimeout(timer);
     return await r.json();
-  }catch(e){return{ok:false,msg:String(e.message||e)};}
+  }catch(e){
+    clearTimeout(timer);
+    if(tries>1)return apiFetch(payload,tries-1);
+    const timedOut=e&&e.name==='AbortError';
+    return{ok:false,msg:timedOut?'伺服器回應逾時（已重試一次）':String(e.message||e)};
+  }
 }
 let page={v:'home'},book=null,filt={cat:'all',region:'全部',days:'全部',month:'全部',max:60000,sort:'new',view:'list'};
 (async function boot(){
-  if(!hasGas()&&(!API_URL||!TOKEN)){
-    TOURS=DEMO;
-    showDemo(!API_URL?'API_URL 還沒填':'TOKEN 還沒填');
-    render();return;
-  }
-  const r=await api({action:'getPublic'});
-  if(r.ok){SET=r.settings;TOURS=r.tours;ONLINE=true;}
-  else{TOURS=DEMO;showDemo(r.msg||'無法連線');console.error('API 回應：',r);}
-  const want=String(urlParam('tour')||'').trim();
-  if(want){
-    const hit=TOURS.filter(function(t){return String(t.id).trim()===want;})[0];
-    if(hit)page={v:'detail',id:hit.id,tab:'feat',date:liveDates(hit)[0],img:0};
-    else setTimeout(function(){toast('找不到行程編號 '+want+'，已回到首頁');},600);
+  try{
+    if(!hasGas()&&(!API_URL||!TOKEN)){
+      TOURS=DEMO;
+      showDemo(!API_URL?'API_URL 還沒填':'TOKEN 還沒填');
+      render();return;
+    }
+    const r=await api({action:'getPublic'});
+    if(r.ok){SET=r.settings;TOURS=r.tours;ONLINE=true;}
+    else{TOURS=DEMO;showDemo(r.msg||'無法連線');console.error('API 回應：',r);}
+    const want=String(urlParam('tour')||'').trim();
+    if(want){
+      const hit=TOURS.filter(function(t){return String(t.id).trim()===want;})[0];
+      if(hit)page={v:'detail',id:hit.id,tab:'feat',date:liveDates(hit)[0],img:0};
+      else setTimeout(function(){toast('找不到行程編號 '+want+'，已回到首頁');},600);
+    }
+  }catch(e){
+    console.error('boot 發生非預期錯誤：',e);
+    TOURS=TOURS&&TOURS.length?TOURS:DEMO;
+    showDemo('程式發生錯誤：'+String(e.message||e));
   }
   render();
 })();
 function showDemo(reason){
   const el=document.getElementById('demoBar');
   el.style.display='';
-  el.textContent='示範模式：'+reason+'　（報名資料不會寫入試算表）';
+  el.innerHTML='示範模式：'+esc(reason)+'　（報名資料不會寫入試算表）　'+
+    '<button onclick="location.reload()" style="text-decoration:underline;color:inherit;font-weight:700">重新整理再試一次</button>';
 }
 const DEMO=[{id:'DEMO',name:'示範行程 5 日',cat:'國外旅遊',region:'日本',days:5,nights:4,price:32900,from:'台北',
   quota:35,dates:['2026-11-03'],soldMap:{'2026-11-03':0},status:'上架',emoji:'🍁',img:'',video:'',
