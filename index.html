@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>行程報名</title>
-<meta property="og:title" content="達人網旅行社｜行程報名">
+<meta property="og:title" content="達鼎旅行社｜行程報名">
 <meta property="og:description" content="線上瀏覽行程、選擇出發日期，三分鐘完成報名">
 <meta property="og:type" content="website">
 <base target="_top">
@@ -279,7 +279,7 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v6.5';
+const APP_VER='v6.6';
 const API_URL='https://script.google.com/macros/s/AKfycbzkaSWLTyweKqGcJm4hBUddXsQqzZbHN2RGTI8yjCIq2rwKO47hbBUSXCFtE4GpxqlREg/exec';
 const TOKEN='dotzingtravelcom';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
@@ -406,12 +406,41 @@ async function apiFetch(payload,tries){
     const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({token:TOKEN,...payload}),signal:ctrl.signal});
     clearTimeout(timer);
-    return await r.json();
+    const text=await r.text();
+    try{
+      return JSON.parse(text);
+    }catch(pe){
+      /* 外部主機呼叫 Apps Script 時，部分瀏覽器會把這種跨網域的 POST
+         在轉址過程中降級成 GET，資料就不見了，換來的是網頁畫面而不是
+         JSON，才會在這裡解析失敗。GET 請求不會被這樣降級，改用它重試
+         一次，使用者不會感覺到任何差異。 */
+      return apiGet(payload);
+    }
   }catch(e){
     clearTimeout(timer);
     if(tries>1)return apiFetch(payload,tries-1);
     const timedOut=e&&e.name==='AbortError';
     return{ok:false,msg:timedOut?'伺服器回應逾時（已重試一次）':String(e.message||e)};
+  }
+}
+/* POST 被轉址降級成 GET 時的備援路線：把整包資料放進網址參數，
+   一律用 GET 呼叫，GET 不會在轉址過程中被改寫，資料才保得住。 */
+async function apiGet(payload){
+  const rest=Object.assign({},payload);delete rest.action;delete rest.token;
+  const url=API_URL+(API_URL.indexOf('?')>=0?'&':'?')+
+    'action='+encodeURIComponent(payload.action||'')+
+    '&token='+encodeURIComponent(TOKEN)+
+    '&payload='+encodeURIComponent(JSON.stringify(rest));
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),12000);
+  try{
+    const r=await fetch(url,{method:'GET',signal:ctrl.signal});
+    clearTimeout(timer);
+    return await r.json();
+  }catch(e){
+    clearTimeout(timer);
+    const timedOut=e&&e.name==='AbortError';
+    return{ok:false,msg:timedOut?'伺服器回應逾時':String(e.message||e)};
   }
 }
 let page={v:'home'},book=null,filt={cat:'all',region:'全部',days:'全部',month:'全部',max:60000,sort:'new',view:'list'};
