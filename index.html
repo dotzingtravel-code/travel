@@ -279,7 +279,7 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v6.4';
+const APP_VER='v6.5';
 const API_URL='';
 const TOKEN='';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
@@ -288,6 +288,14 @@ let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'
   cats:['國內旅遊','國外旅遊','郵輪旅遊','企業包團']};
 let TOURS=[];
 let ONLINE=false;
+/* DEMO 必須在 boot() 之前就宣告好；boot() 可能在還沒等到任何非同步結果前
+   就同步用到它（例如 API_URL/TOKEN 還沒填時的提早分支），
+   宣告若晚於 boot() 的呼叫位置，會被 const 的暫時死區擋下而整頁崩潰。 */
+const DEMO=[{id:'DEMO',name:'示範行程 5 日',cat:'國外旅遊',region:'日本',days:5,nights:4,price:32900,from:'台北',
+  quota:35,dates:['2026-11-03'],soldMap:{'2026-11-03':0},status:'上架',emoji:'🍁',img:'',video:'',
+  bg:'linear-gradient(135deg,#f4a259,#d9534f)',lead:'連線後端後，這裡會顯示你在後台建立的行程',
+  pickups:[{p:'台北車站東三門',t:'06:00'}],feats:['請於後台新增行程'],itin:[['Day 1','—']],
+  inc:['—'],exc:['—'],notes:['—']}];
 const tourOf=id=>TOURS.find(t=>t.id===id);
 const money=n=>'NT$ '+Number(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -436,11 +444,6 @@ function showDemo(reason){
   el.innerHTML='示範模式：'+esc(reason)+'　（報名資料不會寫入試算表）　'+
     '<button onclick="location.reload()" style="text-decoration:underline;color:inherit;font-weight:700">重新整理再試一次</button>';
 }
-const DEMO=[{id:'DEMO',name:'示範行程 5 日',cat:'國外旅遊',region:'日本',days:5,nights:4,price:32900,from:'台北',
-  quota:35,dates:['2026-11-03'],soldMap:{'2026-11-03':0},status:'上架',emoji:'🍁',img:'',video:'',
-  bg:'linear-gradient(135deg,#f4a259,#d9534f)',lead:'連線後端後，這裡會顯示你在後台建立的行程',
-  pickups:[{p:'台北車站東三門',t:'06:00'}],feats:['請於後台新增行程'],itin:[['Day 1','—']],
-  inc:['—'],exc:['—'],notes:['—']}];
 function render(){
   document.getElementById('navBar').innerHTML=navHTML();
   document.getElementById('footBar').innerHTML=footHTML();
