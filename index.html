@@ -279,7 +279,7 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v6.6';
+const APP_VER='v6.7';
 const API_URL='https://script.google.com/macros/s/AKfycbzkaSWLTyweKqGcJm4hBUddXsQqzZbHN2RGTI8yjCIq2rwKO47hbBUSXCFtE4GpxqlREg/exec';
 const TOKEN='dotzingtravelcom';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
@@ -353,13 +353,23 @@ function fmtPhone(v){
 function rocToISO(v){
   const t=String(v==null?'':v).trim().replace(/[.\/]/g,'-').replace(/\s/g,'');
   if(!t)return '';
-  let m=t.match(/^(\d{1,3})-(\d{1,2})-(\d{1,2})$/);
   let y,mo,da;
-  if(m){y=Number(m[1])+1911;mo=Number(m[2]);da=Number(m[3]);}
+  /* 手機的數字鍵盤打不出減號，客人只能連續輸入六碼或七碼數字，
+     這裡直接依長度判斷：6 碼＝兩位民國年，7 碼＝三位民國年（民國 100 年以後）。 */
+  let m=t.match(/^(\d{6})$/);
+  if(m){y=Number(t.slice(0,2))+1911;mo=Number(t.slice(2,4));da=Number(t.slice(4,6));}
   else{
-    m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    if(!m)return '';
-    y=Number(m[1]);mo=Number(m[2]);da=Number(m[3]);
+    m=t.match(/^(\d{7})$/);
+    if(m){y=Number(t.slice(0,3))+1911;mo=Number(t.slice(3,5));da=Number(t.slice(5,7));}
+    else{
+      m=t.match(/^(\d{1,3})-(\d{1,2})-(\d{1,2})$/);
+      if(m){y=Number(m[1])+1911;mo=Number(m[2]);da=Number(m[3]);}
+      else{
+        m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if(!m)return '';
+        y=Number(m[1]);mo=Number(m[2]);da=Number(m[3]);
+      }
+    }
   }
   if(mo<1||mo>12||da<1||da>31)return '';
   const d=new Date(y,mo-1,da);
@@ -374,8 +384,11 @@ function isoToROC(v){
   return (y>0?y:t.slice(0,4))+'-'+t.slice(5,7)+'-'+t.slice(8,10);
 }
 function setBirth(i,v){
-  book.list[i].birthText=v;
-  book.list[i].birth=rocToISO(v);
+  const iso=rocToISO(v);
+  /* 手機數字鍵盤打出來的是一長串沒有減號的數字，格式對得上就自動補上減號顯示，
+     讓客人確認自己打的日期有沒有被系統看懂，而不是照抄一串數字放著看不懂。 */
+  book.list[i].birthText=iso?isoToROC(iso):v;
+  book.list[i].birth=iso;
 }
 const phoneOK=v=>/^0\d{8,9}$/.test(String(v||'').replace(/\D/g,''));
 function embed(u){if(!u)return'';const m=String(u).match(/(?:youtu[.]be[/]|v=)([\w-]{6,})/);return m?'https:\/\/www.youtube.com/embed/'+m[1]:'';}
@@ -804,9 +817,9 @@ function paxCard(p,i,t){
     <div class="f"><label>中文姓名 <span class="req">*</span></label><input value="${esc(p.cn)}" placeholder="與證件相同" oninput="pSet(${i},'cn',this.value)"></div>
     <div class="f"><label>英文姓名${isAbroad(t)?' <span class="req">*建議填寫</span>':'（選填）'}</label><input value="${esc(p.en)}" placeholder="護照拼音" oninput="pSet(${i},'en',this.value)"></div>
     <div class="f"><label>出生日期 <span class="req">*</span></label>
-      <input value="${esc(p.birthText!==undefined?p.birthText:isoToROC(p.birth))}" placeholder="民國年　例 67-02-25"
+      <input value="${esc(p.birthText!==undefined?p.birthText:isoToROC(p.birth))}" placeholder="民國年，例 680413 或 67-02-25"
         inputmode="numeric" onchange="setBirth(${i},this.value);render()" oninput="setBirth(${i},this.value)">
-      <span class="hint2">${p.birth?'西元 '+p.birth:'請填民國年，例如民國 67 年 2 月 25 日填 67-02-25'}</span></div>
+      <span class="hint2">${p.birth?'西元 '+p.birth:'手機鍵盤沒有減號沒關係，直接連續輸入 6 碼數字即可，例如民國 68 年 4 月 13 日輸入 680413'}</span></div>
     <div class="f"><label>身分證字號 <span class="req">*</span></label><input value="${esc(p.pid)}" placeholder="A123456789" oninput="pSet(${i},'pid',this.value)"></div>
     <div class="f"><label>性別</label><select onchange="pSet(${i},'sex',this.value)">${opt(['男','女'],p.sex)}</select></div>
     <div class="f"><label>手機（選填）</label><input value="${esc(p.phone)}" placeholder="0912-345678"
