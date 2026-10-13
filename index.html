@@ -145,6 +145,15 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 .viewtog button{padding:5px 12px;border-radius:6px;font-size:12.5px;color:var(--ink-2)}
 .viewtog button.on{background:#fff;color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(15,31,56,.12)}
 .listbar select{margin-left:10px}
+.sc-wrap{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
+.sc-t{background:linear-gradient(135deg,var(--brand),var(--brand-2,#1652a8));color:#fff;text-align:center;font-weight:700;padding:12px;font-size:16px}
+.sc{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+.sc th{background:#eaf1fb;font-weight:600;padding:9px 8px;border:1px solid #d6e2f3;font-size:13px}
+.sc td{padding:10px 8px;border:1px solid var(--line);text-align:center}
+.sc tbody tr{cursor:pointer}.sc tbody tr:hover{background:#f3f8ff}
+.sc-n{text-align:left!important}.sc-n a{color:#1f5fbf;text-decoration:underline}
+.sc-ok,.sc-full{color:#e0261b}.sc-wait{color:var(--ink-2)}
+.sc-d{white-space:nowrap}
 .tlist{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .thead,.trow{display:grid;grid-template-columns:76px minmax(200px,1fr) 82px 74px 152px 116px 86px 96px;
   gap:12px;align-items:center;padding:11px 16px}
@@ -279,8 +288,8 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v6.7';
-const API_URL='https://script.google.com/macros/s/AKfycbzkaSWLTyweKqGcJm4hBUddXsQqzZbHN2RGTI8yjCIq2rwKO47hbBUSXCFtE4GpxqlREg/exec';
+const APP_VER='v7.0';
+const API_URL='';
 const TOKEN='dotzingtravelcom';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
   pickups:[],rooms:['雙人房（2人1室）','三人房（3人1室）','四人房（4人1室）','單人房（需補差額）','與同行者同房'],
@@ -408,7 +417,7 @@ async function api(payload){
     });
   }
   if(!API_URL)return{ok:false,msg:'尚未設定 API_URL'};
-  return apiFetch(payload,2);
+  return apiFetch(payload,1);
 }
 /* fetch() 沒有內建逾時，若不設上限，Apps Script 回應慢或卡住時會永遠等下去，
    畫面就卡死在「載入中」。這裡設 12 秒逾時，逾時或失敗時自動重試一次再放棄。 */
@@ -431,9 +440,14 @@ async function apiFetch(payload,tries){
     }
   }catch(e){
     clearTimeout(timer);
+    /* POST 逾時或連線失敗時，用同一種方式再試一次也多半沒用
+       （像 LINE 內建瀏覽器對 POST 特別容易卡住），改試 GET 這條
+       不同的路線，命中率比原地重試高很多，也不會拖更久。 */
+    const r2=await apiGet(payload);
+    if(r2.ok)return r2;
     if(tries>1)return apiFetch(payload,tries-1);
     const timedOut=e&&e.name==='AbortError';
-    return{ok:false,msg:timedOut?'伺服器回應逾時（已重試一次）':String(e.message||e)};
+    return{ok:false,msg:timedOut?'伺服器回應逾時（已改用備援方式仍失敗）':String(e.message||e)};
   }
 }
 /* POST 被轉址降級成 GET 時的備援路線：把整包資料放進網址參數，
@@ -467,6 +481,7 @@ let page={v:'home'},book=null,filt={cat:'all',region:'全部',days:'全部',mont
     const r=await api({action:'getPublic'});
     if(r.ok){SET=r.settings;TOURS=r.tours;ONLINE=true;}
     else{TOURS=DEMO;showDemo(r.msg||'無法連線');console.error('API 回應：',r);}
+    if(urlParam('page')==='sched')page={v:'sched'};
     const want=String(urlParam('tour')||'').trim();
     if(want){
       const hit=TOURS.filter(function(t){return String(t.id).trim()===want;})[0];
@@ -490,11 +505,12 @@ function render(){
   document.getElementById('navBar').innerHTML=navHTML();
   document.getElementById('footBar').innerHTML=footHTML();
   const el=document.getElementById('body');
-  el.innerHTML=page.v==='home'?viewHome():page.v==='list'?viewList():page.v==='detail'?viewDetail():viewBook();
+  el.innerHTML=page.v==='home'?viewHome():page.v==='list'?viewList():page.v==='sched'?viewSched():page.v==='detail'?viewDetail():viewBook();
 }
 function navHTML(){const c=SET.company;
   return `<div class="logo">${c.logo?`<img src="${esc(c.logo)}" alt="">`:`<i>${esc(c.logoText||'旅')}</i>`}${esc(c.name)}</div>
   <nav><a href="#" class="${page.v==='home'?'on':''}" onclick="goHome(event)">首頁</a>
+  <a href="#" class="${page.v==='sched'?'on':''}" onclick="goSched(event)">出團日期表</a>
   ${SET.cats.map(k=>`<a href="#" onclick="goList(event,'${esc(k)}')">${esc(k)}</a>`).join('')}</nav>
   <div class="contact">${esc(c.tel)}${c.line?'<br>LINE '+esc(c.line):''}</div>`;}
 function footHTML(){
@@ -530,6 +546,69 @@ function showDiag(){
     '本頁網址：'+location.href+'\n'+
     '外層頁面：'+ref
   );
+}
+const SCHED_SEATS=true;
+let schedMonth='全部';
+function goSched(e){e&&e.preventDefault();page={v:'sched'};render();scrollTo(0,0);}
+function schedRows(){
+  const n=todayISO(),rows=[];
+  TOURS.filter(t=>!isHidden(t)).forEach(t=>(t.dates||[]).forEach(d=>{if(d>=n)rows.push({t:t,d:d});}));
+  rows.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:String(a.t.name).localeCompare(String(b.t.name)));
+  return rows;
+}
+function viewSched(){
+  const all=schedRows(),months=['全部'].concat([...new Set(all.map(r=>r.d.slice(0,7)))]);
+  if(!months.includes(schedMonth))schedMonth='全部';
+  const rows=schedMonth==='全部'?all:all.filter(r=>r.d.slice(0,7)===schedMonth);
+  const seats=SCHED_SEATS;
+  const body=rows.map(r=>{
+    const t=r.t,sold=(t.soldMap&&t.soldMap[r.d])||0,q=Number(t.quota)||0,min=Number(t.minPax)||16,rest=Math.max(0,q-sold);
+    const st=rest===0&&q?'<b class="sc-full">已額滿</b>':(sold>=min?'<b class="sc-ok">已成團</b>':'<span class="sc-wait">報名中</span>');
+    const pk=(t.pickups||[]).map(p=>p.p).filter(Boolean).slice(0,3).join('、')||esc(t.from||'');
+    return `<tr onclick="page={v:'detail',id:'${t.id}',tab:'feat',date:'${r.d}',img:0};render();scrollTo(0,0)">
+      <td>${esc(pk)}</td><td class="sc-d">${r.d.replace(/-/g,'.')}</td><td>${t.days||''}</td>
+      <td class="sc-n"><a>${esc(t.name)}</a></td><td>${money(t.price)}</td>
+      ${seats?`<td>${q}</td><td>${sold}</td><td>${rest}</td>`:''}<td>${st}</td></tr>`;}).join('');
+  return `<div style="padding:22px 0 40px"><h2 style="font-size:22px;margin-bottom:12px">出團日期表</h2>
+    <div class="listbar"><span class="cnt">共 ${rows.length} 個出發日</span>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="shb" onclick="copySchedLink()">🔗 複製連結</button><button class="shb" onclick="copySchedText()">📋 複製日期表文字</button></div>
+      <select style="margin-left:10px" onchange="schedMonth=this.value;render()">${months.map(m=>`<option value="${m}" ${schedMonth===m?'selected':''}>${m==='全部'?'全部月份':m.replace('-',' 年 ')+' 月'}</option>`).join('')}</select></div>
+    <div class="sc-wrap"><div class="sc-t">團體旅遊　報名請點行程名稱，以出發日期排序</div>
+    <div style="overflow-x:auto"><table class="sc"><thead><tr><th>上車地點</th><th>出發日期</th><th>天</th><th>行程名</th><th>售價</th>
+      ${seats?'<th>總位</th><th>已報名</th><th>可售</th>':''}<th>成團狀態</th></tr></thead>
+      <tbody>${body||'<tr><td colspan="9" style="padding:30px;color:var(--ink-2)">目前沒有開放的出團日期</td></tr>'}</tbody></table></div></div></div>`;
+}
+function copyTxt(txt,msg){
+  const fb=function(){
+    const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;left:-999px;top:0';
+    document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}
+    ta.remove();if(ok)toast(msg);else prompt('請手動複製',txt);};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(txt).then(()=>toast(msg)).catch(fb);else fb();
+}
+function schedLink(){
+  const b=shareTarget();if(!b)return '';
+  return b.replace(/[?#].*$/,'')+'?page=sched';
+}
+function copySchedLink(){
+  const l=schedLink();
+  if(!l){toast('請先到後台「系統設定」填寫網站網址');return;}
+  copyTxt(l,'出團日期表連結已複製');
+}
+function copySchedText(){
+  const rows=schedMonth==='全部'?schedRows():schedRows().filter(r=>r.d.slice(0,7)===schedMonth);
+  if(!rows.length){toast('目前沒有可複製的出團日期');return;}
+  const wk=['日','一','二','三','四','五','六'];
+  let cur='',out='【'+((SET.company&&SET.company.name)||'')+' 出團日期表】\n';
+  rows.forEach(r=>{
+    const m=r.d.slice(0,7).replace('-',' 年 ')+' 月';
+    if(m!==cur){cur=m;out+='\n■ '+m+'\n';}
+    const dt=new Date(r.d+'T00:00:00'),sold=(r.t.soldMap&&r.t.soldMap[r.d])||0,q=Number(r.t.quota)||0;
+    const full=q&&sold>=q;
+    out+=r.d.slice(5).replace('-','/')+'（'+wk[dt.getDay()]+'）'+r.t.name+'　$'+r.t.price+(full?'　已額滿':'')+'\n';
+  });
+  const l=schedLink();
+  if(l)out+='\n詳細行程與報名：'+l;
+  copyTxt(out,'出團日期表文字已複製，可貼到 LINE');
 }
 function goHome(e){e&&e.preventDefault();page={v:'home'};render();scrollTo(0,0);}
 function goList(e,cat){e&&e.preventDefault();filt.cat=cat||'all';page={v:'list'};render();scrollTo(0,0);}
@@ -719,6 +798,7 @@ function urlParam(name){
     const m=String(str).match(new RegExp('[?&#]'+name+'=([^&#]+)'));
     return m?decodeURIComponent(m[1]):'';
   };
+  if(name==='page'&&typeof window.__PAGE__==='string'&&window.__PAGE__)return window.__PAGE__;
   if(name==='tour'&&typeof window.__TOUR__==='string'&&window.__TOUR__)return window.__TOUR__;
   let r='';
   try{r=document.referrer;}catch(e){}
