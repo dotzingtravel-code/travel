@@ -154,6 +154,11 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 .sc-n{text-align:left!important}.sc-n a{color:#1f5fbf;text-decoration:underline}
 .sc-ok,.sc-full{color:#e0261b}.sc-wait{color:var(--ink-2)}
 .sc-d{white-space:nowrap}
+.scbtn{background:#fff;color:var(--brand);border:1px solid var(--brand);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.scbtn:hover{background:var(--brand);color:#fff}
+.sc-pk{max-width:180px;white-space:nowrap}
+.sc-pk span{display:inline-block;max-width:130px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.sc-pk small{color:var(--ink-2);font-size:11.5px}
 .tlist{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .thead,.trow{display:grid;grid-template-columns:76px minmax(200px,1fr) 82px 74px 152px 116px 86px 96px;
   gap:12px;align-items:center;padding:11px 16px}
@@ -550,6 +555,13 @@ function showDiag(){
 const SCHED_SEATS=true;
 let schedMonth='全部';
 function goSched(e){e&&e.preventDefault();page={v:'sched'};render();scrollTo(0,0);}
+const CITIES=['台北','新北','基隆','桃園','新竹','苗栗','台中','彰化','南投','雲林','嘉義','台南','高雄','屏東','宜蘭','花蓮','台東','澎湖','金門','連江'];
+function pickCities(list){
+  const txt=list.join('、').replace(/臺/g,'台'),hit=[];
+  CITIES.forEach(c=>{const i=txt.indexOf(c);if(i>=0)hit.push([i,c]);});
+  hit.sort((a,b)=>a[0]-b[0]);
+  return hit.map(x=>x[1]).join('/');
+}
 function schedRows(){
   const n=todayISO(),rows=[];
   TOURS.filter(t=>!isHidden(t)).forEach(t=>(t.dates||[]).forEach(d=>{if(d>=n)rows.push({t:t,d:d});}));
@@ -564,14 +576,14 @@ function viewSched(){
   const body=rows.map(r=>{
     const t=r.t,sold=(t.soldMap&&t.soldMap[r.d])||0,q=Number(t.quota)||0,min=Number(t.minPax)||16,rest=Math.max(0,q-sold);
     const st=rest===0&&q?'<b class="sc-full">已額滿</b>':(sold>=min?'<b class="sc-ok">已成團</b>':'<span class="sc-wait">報名中</span>');
-    const pk=(t.pickups||[]).map(p=>p.p).filter(Boolean).slice(0,3).join('、')||esc(t.from||'');
+    const pks=(t.pickups||[]).map(p=>p.p).filter(Boolean),pk=pickCities(pks)||pks[0]||t.from||'',pkAll=pks.join('、')||pk,pkMore='';
     return `<tr onclick="page={v:'detail',id:'${t.id}',tab:'feat',date:'${r.d}',img:0};render();scrollTo(0,0)">
-      <td>${esc(pk)}</td><td class="sc-d">${r.d.replace(/-/g,'.')}</td><td>${t.days||''}</td>
+      <td class="sc-pk" title="${esc(pkAll)}"><span>${esc(pk)}</span>${pkMore}</td><td class="sc-d">${r.d.replace(/-/g,'.')}</td><td>${t.days||''}</td>
       <td class="sc-n"><a>${esc(t.name)}</a></td><td>${money(t.price)}</td>
       ${seats?`<td>${q}</td><td>${sold}</td><td>${rest}</td>`:''}<td>${st}</td></tr>`;}).join('');
   return `<div style="padding:22px 0 40px"><h2 style="font-size:22px;margin-bottom:12px">出團日期表</h2>
     <div class="listbar"><span class="cnt">共 ${rows.length} 個出發日</span>
-      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="shb" onclick="copySchedLink()">🔗 複製連結</button><button class="shb" onclick="copySchedText()">📋 複製日期表文字</button></div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="scbtn" onclick="copySchedLink()">複製連結</button><button class="scbtn" onclick="copySchedText()">複製日期表文字</button></div>
       <select style="margin-left:10px" onchange="schedMonth=this.value;render()">${months.map(m=>`<option value="${m}" ${schedMonth===m?'selected':''}>${m==='全部'?'全部月份':m.replace('-',' 年 ')+' 月'}</option>`).join('')}</select></div>
     <div class="sc-wrap"><div class="sc-t">團體旅遊　報名請點行程名稱，以出發日期排序</div>
     <div style="overflow-x:auto"><table class="sc"><thead><tr><th>上車地點</th><th>出發日期</th><th>天</th><th>行程名</th><th>售價</th>
