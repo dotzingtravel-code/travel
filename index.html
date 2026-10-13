@@ -147,7 +147,7 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 .listbar select{margin-left:10px}
 .sc-wrap{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
 .sc-t{background:linear-gradient(135deg,var(--brand),var(--brand-2,#1652a8));color:#fff;text-align:center;font-weight:700;padding:12px;font-size:16px}
-.sc{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+.sc{width:100%;border-collapse:collapse;font-size:14px;min-width:600px}
 .sc th{background:#eaf1fb;font-weight:600;padding:9px 8px;border:1px solid #d6e2f3;font-size:13px}
 .sc td{padding:10px 8px;border:1px solid var(--line);text-align:center}
 .sc tbody tr{cursor:pointer}.sc tbody tr:hover{background:#f3f8ff}
@@ -293,7 +293,7 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v7.0';
+const APP_VER='v7.2';
 const API_URL='https://script.google.com/macros/s/AKfycbzkaSWLTyweKqGcJm4hBUddXsQqzZbHN2RGTI8yjCIq2rwKO47hbBUSXCFtE4GpxqlREg/exec';
 const TOKEN='dotzingtravelcom';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
@@ -576,9 +576,7 @@ function viewSched(){
   const body=rows.map(r=>{
     const t=r.t,sold=(t.soldMap&&t.soldMap[r.d])||0,q=Number(t.quota)||0,min=Number(t.minPax)||16,rest=Math.max(0,q-sold);
     const st=rest===0&&q?'<b class="sc-full">已額滿</b>':(sold>=min?'<b class="sc-ok">已成團</b>':'<span class="sc-wait">報名中</span>');
-    const pks=(t.pickups||[]).map(p=>p.p).filter(Boolean),pk=pickCities(pks)||pks[0]||t.from||'',pkAll=pks.join('、')||pk,pkMore='';
-    return `<tr onclick="page={v:'detail',id:'${t.id}',tab:'feat',date:'${r.d}',img:0};render();scrollTo(0,0)">
-      <td class="sc-pk" title="${esc(pkAll)}"><span>${esc(pk)}</span>${pkMore}</td><td class="sc-d">${r.d.replace(/-/g,'.')}</td><td>${t.days||''}</td>
+    return `<tr onclick="page={v:'detail',id:'${t.id}',tab:'feat',date:'${r.d}',img:0};render();scrollTo(0,0)"><td class="sc-d">${r.d.replace(/-/g,'.')}</td><td>${t.days||''}</td>
       <td class="sc-n"><a>${esc(t.name)}</a></td><td>${money(t.price)}</td>
       ${seats?`<td>${q}</td><td>${sold}</td><td>${rest}</td>`:''}<td>${st}</td></tr>`;}).join('');
   return `<div style="padding:22px 0 40px"><h2 style="font-size:22px;margin-bottom:12px">出團日期表</h2>
@@ -586,7 +584,7 @@ function viewSched(){
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="scbtn" onclick="copySchedLink()">複製連結</button><button class="scbtn" onclick="copySchedText()">複製日期表文字</button></div>
       <select style="margin-left:10px" onchange="schedMonth=this.value;render()">${months.map(m=>`<option value="${m}" ${schedMonth===m?'selected':''}>${m==='全部'?'全部月份':m.replace('-',' 年 ')+' 月'}</option>`).join('')}</select></div>
     <div class="sc-wrap"><div class="sc-t">團體旅遊　報名請點行程名稱，以出發日期排序</div>
-    <div style="overflow-x:auto"><table class="sc"><thead><tr><th>上車地點</th><th>出發日期</th><th>天</th><th>行程名</th><th>售價</th>
+    <div style="overflow-x:auto"><table class="sc"><thead><tr><th>出發日期</th><th>天</th><th>行程名</th><th>售價</th>
       ${seats?'<th>總位</th><th>已報名</th><th>可售</th>':''}<th>成團狀態</th></tr></thead>
       <tbody>${body||'<tr><td colspan="9" style="padding:30px;color:var(--ink-2)">目前沒有開放的出團日期</td></tr>'}</tbody></table></div></div></div>`;
 }
