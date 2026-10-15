@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>行程報名</title>
-<meta property="og:title" content="達人網旅行社｜行程報名">
+<title>達人網旅行社｜國內旅遊行程報名</title>
+<meta name="description" content="達人網旅行社國內旅遊團體行程，高雄、台南出發的一日遊、二日遊，線上瀏覽行程、查看出團日期並直接報名。">
+<meta name="keywords" content="達人網旅行社,達人網,高雄旅行社,高雄出發,台南出發,國內旅遊,一日遊,二日遊,團體旅遊,出團日期,線上報名,行程報名">
+<meta name="robots" content="index,follow">
+<meta property="og:title" content="達人網旅行社｜國內旅遊行程報名">
 <meta property="og:description" content="線上瀏覽行程、選擇出發日期，三分鐘完成報名">
 <meta property="og:type" content="website">
 <base target="_top">
@@ -345,8 +348,8 @@ button{cursor:pointer;border:none;background:none}a{color:inherit;text-decoratio
 <div class="foot"><div class="in" id="footBar"></div></div>
 <script>
 var __PARAMS__;
-const APP_VER='v7.4';
-const API_URL='https://script.google.com/macros/s/AKfycbzkaSWLTyweKqGcJm4hBUddXsQqzZbHN2RGTI8yjCIq2rwKO47hbBUSXCFtE4GpxqlREg/exec';
+const APP_VER='v7.6';
+API_URL='https://script.google.com/macros/s/AKfycbzkaSWLTyweKqGcJm4hBUddXsQqzZbHN2RGTI8yjCIq2rwKO47hbBUSXCFtE4GpxqlREg/exec';
 const TOKEN='dotzingtravelcom';
 let SET={company:{name:'旅行社',logo:'',logoText:'旅',addr:'',tel:'',email:'',fb:'',line:'',bank:'',license:''},
   pickups:[],rooms:['雙人房（2人1室）','三人房（3人1室）','四人房（4人1室）','單人房（需補差額）','與同行者同房'],
@@ -558,11 +561,59 @@ function showDemo(reason){
   el.innerHTML='示範模式：'+esc(reason)+'　（報名資料不會寫入試算表）　'+
     '<button onclick="location.reload()" style="text-decoration:underline;color:inherit;font-weight:700">重新整理再試一次</button>';
 }
+const SEO={
+  brand:'達人網旅行社',
+  area:'高雄、台南',
+  words:['達人網','達人網旅行社','高雄旅行社','高雄出發','台南出發','國內旅遊','團體旅遊','一日遊','二日遊','出團日期','線上報名','行程報名']
+};
+function setMeta(name,content,prop){
+  const sel=prop?'meta[property="'+name+'"]':'meta[name="'+name+'"]';
+  let m=document.head.querySelector(sel);
+  if(!m){m=document.createElement('meta');m.setAttribute(prop?'property':'name',name);document.head.appendChild(m);}
+  m.setAttribute('content',content);
+}
+function setLD(obj){
+  let s=document.getElementById('ldjson');
+  if(!s){s=document.createElement('scr'+'ipt');s.id='ldjson';s.type='application/ld+json';document.head.appendChild(s);}
+  s.textContent=JSON.stringify(obj);
+}
+function uniq(a){return [...new Set(a.filter(Boolean).map(x=>String(x).trim()).filter(Boolean))];}
+function applySEO(){
+  try{
+    const co=(SET&&SET.company)||{},brand=SEO.brand||co.name||'旅行社';
+    const live=(TOURS||[]).filter(t=>!isHidden(t));
+    const SCH='https:\/\/schema.org';
+    let title,desc,kw=SEO.words.slice();
+    if(page.v==='detail'&&tourOf(page.id)){
+      const t=tourOf(page.id),ds=liveDates(t).slice(0,4).map(d=>d.slice(5).replace('-','/')).join('、');
+      title=t.name+'｜'+t.days+'天'+(t.nights?t.nights+'夜':'')+'｜'+brand;
+      desc=(t.lead?t.lead+'。':'')+t.name+'，'+(t.from?t.from+'出發，':'')+'售價 '+t.price+' 元起'+(ds?'，近期出發：'+ds:'')+'，線上報名。';
+      kw=uniq([t.name,t.cat,t.region,t.from?t.from+'出發':'',t.days+'天'+(t.nights||0)+'夜',t.days===1?'一日遊':t.days===2?'二日遊':'',brand].concat(kw));
+      setLD({'@context':SCH,'@type':'TouristTrip',name:t.name,description:desc,
+        touristType:t.cat||undefined,provider:{'@type':'TravelAgency',name:brand},
+        offers:{'@type':'Offer',priceCurrency:'TWD',price:t.price,availability:'https:\/\/schema.org\/InStock'}});
+    }else{
+      title=page.v==='sched'?'出團日期表｜'+brand:brand+'｜國內旅遊行程報名';
+      const names=live.slice(0,6).map(t=>t.name).join('、');
+      desc=(page.v==='sched'?'最新出團日期總表，依出發日期排序，可查看成團狀況並直接報名。':brand+'國內旅遊團體行程，線上瀏覽並報名。')+(names?'熱門行程：'+names+'。':'');
+      kw=uniq(live.map(t=>t.name).concat(live.map(t=>t.region),live.map(t=>t.cat),(SET&&SET.cats)||[],[SEO.area,brand],kw));
+      setLD({'@context':SCH,'@type':'ItemList',itemListElement:live.slice(0,30).map((t,i)=>({
+        '@type':'ListItem',position:i+1,item:{'@type':'TouristTrip',name:t.name,description:t.lead||t.name,
+        offers:{'@type':'Offer',priceCurrency:'TWD',price:t.price}}}))});
+    }
+    document.title=title;
+    setMeta('description',desc.slice(0,160));
+    setMeta('keywords',kw.slice(0,30).join(','));
+    setMeta('og:title',title,1);
+    setMeta('og:description',desc.slice(0,160),1);
+  }catch(e){console.warn('SEO',e);}
+}
 function render(){
   document.getElementById('navBar').innerHTML=navHTML();
   document.getElementById('footBar').innerHTML=footHTML();
   const el=document.getElementById('body');
   el.innerHTML=page.v==='home'?viewHome():page.v==='list'?viewList():page.v==='sched'?viewSched():page.v==='detail'?viewDetail():viewBook();
+  applySEO();
 }
 function navHTML(){const c=SET.company;
   return `<div class="logo">${c.logo?`<img src="${esc(c.logo)}" alt="">`:`<i>${esc(c.logoText||'旅')}</i>`}${esc(c.name)}</div>
